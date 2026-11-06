@@ -1,0 +1,434 @@
+
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#fce7f3">
+<title>Sweet Snake 🐍</title>
+
+<style>
+* {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+}
+
+body {
+    margin: 0;
+    min-height: 100svh;
+    padding: 18px 12px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: linear-gradient(145deg,#ffe3ef,#eadfff,#d9f5ee);
+    font-family: "Trebuchet MS", sans-serif;
+    color: #795c85;
+    overscroll-behavior: none;
+}
+
+.game-container {
+    width: 100%;
+    max-width: 440px;
+    padding: 20px 16px;
+    text-align: center;
+    background: rgba(255,255,255,.8);
+    border: 3px solid white;
+    border-radius: 28px;
+    box-shadow: 0 12px 35px #b99bc955;
+}
+
+h1 {
+    color: #b57ab9;
+    margin: 0 0 5px;
+    font-size: clamp(25px,7vw,34px);
+}
+
+.subtitle {
+    font-size: 13px;
+    color: #aa91b4;
+    margin-bottom: 15px;
+}
+
+.score-box {
+    display: flex;
+    justify-content: space-around;
+    gap: 8px;
+    margin-bottom: 13px;
+}
+
+.score {
+    flex: 1;
+    background: #ffe5ef;
+    padding: 11px 5px;
+    border-radius: 14px;
+    font-weight: bold;
+    font-size: 14px;
+}
+
+canvas {
+    display: block;
+    width: min(100%, 390px);
+    height: auto;
+    aspect-ratio: 1 / 1;
+    margin: auto;
+    background: #f7efff;
+    border: 4px solid white;
+    border-radius: 18px;
+    touch-action: none;
+}
+
+#message {
+    min-height: 24px;
+    margin: 13px 0;
+    font-weight: bold;
+    font-size: 14px;
+    color: #ae78ad;
+}
+
+button {
+    border: none;
+    border-radius: 16px;
+    background: #e7b8dc;
+    color: white;
+    font-size: 17px;
+    font-weight: bold;
+    cursor: pointer;
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+button:active {
+    transform: scale(.94);
+    background: #c98fc8;
+}
+
+#restart {
+    padding: 14px 25px;
+    font-size: 15px;
+    background: #d69ed1;
+}
+
+.controls {
+    display: grid;
+    grid-template-columns: repeat(3, 68px);
+    grid-template-rows: repeat(2, 58px);
+    justify-content: center;
+    gap: 8px;
+    margin: 17px auto 5px;
+}
+
+.controls button {
+    font-size: 25px;
+    box-shadow: 0 4px 0 #d3a4cf;
+}
+
+.controls button:active {
+    box-shadow: 0 1px 0 #d3a4cf;
+}
+
+.empty {
+    visibility: hidden;
+}
+
+.hint {
+    font-size: 11px;
+    color: #ad98b8;
+    margin-top: 12px;
+}
+
+@media (max-height: 700px) {
+    body {
+        align-items: flex-start;
+    }
+    .game-container {
+        padding: 13px;
+    }
+    .controls {
+        margin-top: 10px;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<div class="game-container">
+
+    <h1>🐍 Sweet Snake</h1>
+    <div class="subtitle">Minik yılanınla meyveleri topla! 🍓</div>
+
+    <div class="score-box">
+        <div class="score">⭐ Puan: <span id="score">0</span></div>
+        <div class="score">🏆 Rekor: <span id="best">0</span></div>
+    </div>
+
+    <canvas id="game" width="360" height="360"></canvas>
+
+    <div id="message">Başlamak için butona bas! 💗</div>
+
+    <button id="restart" onclick="startGame()">
+        YENİDEN OYNA 💕
+    </button>
+
+    <div class="controls">
+        <button class="empty"></button>
+        <button onclick="changeDirection('up')">⬆️</button>
+        <button class="empty"></button>
+
+        <button onclick="changeDirection('left')">⬅️</button>
+        <button onclick="changeDirection('down')">⬇️</button>
+        <button onclick="changeDirection('right')">➡️</button>
+    </div>
+
+    <div class="hint">
+        Parmağını kaydırarak veya ok tuşlarına basarak oyna 🌸
+    </div>
+
+</div>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+const tile = 18;
+const count = 20;
+
+let snake;
+let fruit;
+let direction;
+let nextDirection;
+let score = 0;
+let best = Number(localStorage.getItem("snakeBest") || 0);
+let running = false;
+let timer;
+
+const scoreText = document.getElementById("score");
+const bestText = document.getElementById("best");
+const message = document.getElementById("message");
+
+bestText.textContent = best;
+
+function startGame() {
+    clearInterval(timer);
+
+    snake = [
+        {x:10,y:10},
+        {x:9,y:10},
+        {x:8,y:10}
+    ];
+
+    direction = "right";
+    nextDirection = "right";
+    score = 0;
+    running = true;
+
+    scoreText.textContent = score;
+    message.textContent = "Hadi meyveleri topla! 🍓";
+
+    createFruit();
+    draw();
+
+    timer = setInterval(update, 130);
+}
+
+function createFruit() {
+    do {
+        fruit = {
+            x: Math.floor(Math.random()*count),
+            y: Math.floor(Math.random()*count)
+        };
+    } while (
+        snake.some(p => p.x === fruit.x && p.y === fruit.y)
+    );
+}
+
+function changeDirection(newDirection) {
+    if (!running) return;
+
+    const opposite = {
+        up:"down",
+        down:"up",
+        left:"right",
+        right:"left"
+    };
+
+    if (newDirection !== opposite[direction]) {
+        nextDirection = newDirection;
+    }
+}
+
+// Klavye kontrolü
+document.addEventListener("keydown", e => {
+    const keys = {
+        ArrowUp:"up",
+        ArrowDown:"down",
+        ArrowLeft:"left",
+        ArrowRight:"right",
+        w:"up",
+        s:"down",
+        a:"left",
+        d:"right"
+    };
+
+    if (keys[e.key]) {
+        e.preventDefault();
+        changeDirection(keys[e.key]);
+    }
+});
+
+// Telefon ekranında kaydırma kontrolü
+let touchStartX = 0;
+let touchStartY = 0;
+
+canvas.addEventListener("touchstart", e => {
+    e.preventDefault();
+
+    touchStartX = e.changedTouches[0].clientX;
+    touchStartY = e.changedTouches[0].clientY;
+}, {passive:false});
+
+canvas.addEventListener("touchend", e => {
+    e.preventDefault();
+
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    const dy = e.changedTouches[0].clientY - touchStartY;
+
+    if (Math.max(Math.abs(dx),Math.abs(dy)) < 20) return;
+
+    if (Math.abs(dx) > Math.abs(dy)) {
+        changeDirection(dx > 0 ? "right" : "left");
+    } else {
+        changeDirection(dy > 0 ? "down" : "up");
+    }
+}, {passive:false});
+
+function update() {
+    if (!running) return;
+
+    direction = nextDirection;
+
+    const head = {...snake[0]};
+
+    if (direction === "up") head.y--;
+    if (direction === "down") head.y++;
+    if (direction === "left") head.x--;
+    if (direction === "right") head.x++;
+
+    if (
+        head.x < 0 || head.y < 0 ||
+        head.x >= count || head.y >= count
+    ) {
+        gameOver();
+        return;
+    }
+
+    const eating =
+        head.x === fruit.x && head.y === fruit.y;
+
+    const body = eating ? snake : snake.slice(0,-1);
+
+    if (body.some(p => p.x === head.x && p.y === head.y)) {
+        gameOver();
+        return;
+    }
+
+    snake.unshift(head);
+
+    if (eating) {
+        score += 10;
+        scoreText.textContent = score;
+
+        if (score > best) {
+            best = score;
+            bestText.textContent = best;
+            localStorage.setItem("snakeBest",best);
+        }
+
+        createFruit();
+    } else {
+        snake.pop();
+    }
+
+    draw();
+}
+
+function draw() {
+    ctx.clearRect(0,0,360,360);
+
+    ctx.fillStyle = "#f7efff";
+    ctx.fillRect(0,0,360,360);
+
+    // Arka plan noktaları
+    ctx.fillStyle = "#eadcf5";
+
+    for (let x=0;x<count;x++) {
+        for (let y=0;y<count;y++) {
+            ctx.beginPath();
+            ctx.arc(x*tile+9,y*tile+9,1,0,Math.PI*2);
+            ctx.fill();
+        }
+    }
+
+    // Meyve
+    ctx.font = "17px Arial";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("🍓",fruit.x*tile+9,fruit.y*tile+9);
+
+    // Yılan
+    snake.forEach((p,i) => {
+        ctx.fillStyle = i===0 ? "#79c9a5" : "#a5dfc1";
+
+        ctx.beginPath();
+        ctx.roundRect(
+            p.x*tile+1,
+            p.y*tile+1,
+            tile-2,
+            tile-2,
+            6
+        );
+        ctx.fill();
+
+        if (i===0) {
+            ctx.fillStyle = "#456c62";
+
+            let eyes = [];
+
+            if(direction==="right") eyes=[[12,5],[12,12]];
+            if(direction==="left") eyes=[[5,5],[5,12]];
+            if(direction==="up") eyes=[[5,5],[12,5]];
+            if(direction==="down") eyes=[[5,12],[12,12]];
+
+            eyes.forEach(([x,y]) => {
+                ctx.beginPath();
+                ctx.arc(p.x*tile+x,p.y*tile+y,1.6,0,Math.PI*2);
+                ctx.fill();
+            });
+        }
+    });
+}
+
+function gameOver() {
+    running = false;
+    clearInterval(timer);
+
+    message.textContent = "Oyun bitti! 💗 Puanın: " + score;
+
+    ctx.fillStyle = "rgba(255,255,255,.75)";
+    ctx.fillRect(0,0,360,360);
+
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#b57ab9";
+    ctx.font = "bold 24px Trebuchet MS";
+    ctx.fillText("OYUN BİTTİ 💗",180,165);
+
+    ctx.font = "15px Trebuchet MS";
+    ctx.fillText("Tekrar denemek ister misin?",180,200);
+}
+
+startGame();
+</script>
+
+</body>
+</html>
